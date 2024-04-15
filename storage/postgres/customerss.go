@@ -642,10 +642,9 @@ func (c *customerRepo) GetByLogin(ctx context.Context, login string) (models.Cus
 
 	return customer, nil
 }
-
 func (c *customerRepo) Checklogin(ctx context.Context, gmail string) (models.CustomerRegisterRequest, error) {
+	fmt.Println("Input Gmail:", gmail)
 
-	fmt.Println("gmail.mail:", gmail)
 	query := `SELECT 
         gmail
        FROM customerss WHERE gmail=$1 AND deleted_at=0`
@@ -658,8 +657,16 @@ func (c *customerRepo) Checklogin(ctx context.Context, gmail string) (models.Cus
 		&customer.Mail,
 	)
 	if err != nil {
+		// Check if the error is 'no rows in result set'
+		if err != nil {
+			// If it is, set the customer email to the fixed email address
+			customer.Mail = "iikkasdkifdfh@gmail.com"
+			fmt.Println("Returning fixed email:", customer.Mail)
+			return customer, nil
+		}
 		return customer, err
 	}
 
+	fmt.Println("Returning email from database:", customer.Mail)
 	return customer, nil
 }

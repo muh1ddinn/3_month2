@@ -57,37 +57,44 @@ func (a authService) CustomerLogin(ctx context.Context, loginRequest models.Cust
 }
 
 func (a authService) CustomerRegister(ctx context.Context, logRequest models.CustomerRegisterRequest) error {
-	fmt.Println("loginRequest.Maillllllll:", logRequest.Mail)
+	fmt.Println("loginRequest.Mail:", logRequest.Mail)
 
 	// Check if the customer already exists in the database
 	customer, err := a.storage.Customer().Checklogin(ctx, logRequest.Mail)
 	if err != nil {
-		// Handle the error, e.g., customer not found or database error
-		fmt.Println("Error while checking login:", err)
-		return err
-	}
-
-	// Check if the email exists in the database
-	if customer.Mail != logRequest.Mail {
-		fmt.Println("You have already registered. Please login.")
-		// Handle the case where the customer already exists
-		return fmt.Errorf("customer with email %s already exists", logRequest.Mail)
-	} else {
-		// Generate OTP and send it to the user
-		otpCode := pkg.GenerateOTP()
-		msg := fmt.Sprintf("Your otp code is: %v, for registering RENT_CAR. Don't give it to anyone", otpCode)
-
-		// err := a.redis.SetX(ctx, logRequest.Mail, otpCode, time.Minute*2)
-		// if err != nil {
-		// 	a.log.Error("Error while setting OTP code in Redis for customer registration: ", logger.Error(err))
-		// 	return err
-		// }
-
-		err = smtp.Sendmail(logRequest.Mail, msg)
-		if err != nil {
-			a.log.Error("Error while sending OTP code to customer for registration: ", logger.Error(err))
+		// Check specifically for 'no rows in result set' which indicates no existing record
+		if err.Error() == "sql: no rows in result set" {
+			// No existing customer found, proceed to register
+		} else {
+			// Handle genuine errors
+			fmt.Println("Error while checking login:", err)
 			return err
 		}
+	}
+
+	// If customer exists and the email matches, prevent registration
+	if customer.Mail == logRequest.Mail {
+		fmt.Println("You have already registered. Please login.")
+		return fmt.Errorf("customer with email %s already exists", logRequest.Mail)
+	}
+
+	// Generate OTP and send it to the user
+	otpCode := pkg.GenerateOTP()
+	msg := fmt.Sprintf("Your OTP code is: %v, for registering at RENT_CAR. Don't give it to anyone", otpCode)
+
+	// Set OTP code in Redis with a 2-minute expiration
+	// Uncomment and use your actual redis or caching mechanism here
+	// err = a.redis.SetX(ctx, logRequest.Mail, otpCode, time.Minute*2)
+	// if err != nil {
+	//  a.log.Error("Error while setting OTP code in Redis for customer registration: ", logger.Error(err))
+	//  return err
+	// }
+
+	// Send the OTP via email
+	err = smtp.Sendmail(logRequest.Mail, msg)
+	if err != nil {
+		a.log.Error("Error while sending OTP code to customer for registration: ", logger.Error(err))
+		return err
 	}
 
 	return nil
